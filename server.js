@@ -78,10 +78,15 @@ async function kp(apiPath) {
 }
 
 // Новости Кинопоиска в неофициальном API перестали обновляться в 2024, поэтому берём RSS-ленты
+// Лент кино несколько: какая-то может не пускать зарубежные серверы Render (так было с КГ-Порталом)
 const NEWS_FEEDS = [
-  { url: 'https://kg-portal.ru/rss/news.rss', source: 'КГ-Портал', take: 5 }, // кино и сериалы
-  { url: 'https://rss.stopgame.ru/rss_news.xml', source: 'StopGame', take: 3 }, // игры
+  { url: 'https://www.kinopoisk.ru/news.rss', source: 'Кинопоиск', group: 'кино' },
+  { url: 'https://www.kinonews.ru/rss/', source: 'KinoNews', group: 'кино' },
+  { url: 'https://kanobu.ru/rss/news.xml', source: 'Канобу', group: 'кино' },
+  { url: 'https://rss.stopgame.ru/rss_news.xml', source: 'StopGame', group: 'игры' },
 ];
+const NEWS_TAKE = { кино: 5, игры: 3 };
+const byDate = (a, b) => (b.publishedAt || '').localeCompare(a.publishedAt || '');
 const decode = s => s.replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(n)).replace(/&quot;/g, '"')
   .replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 
@@ -91,7 +96,7 @@ function parseRss(xml, source) {
     const tag = t => (new RegExp(`<${t}>\\s*(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?\\s*</${t}>`).exec(it) || [])[1] || '';
     const date = new Date(tag('pubDate'));
     return {
-      title: decode(tag('title')), url: tag('link'), source,
+      title: decode(tag('title')).trim(), url: tag('link'), source,
       imageUrl: (/<enclosure[^>]*url="([^"]+)"/.exec(it) || [])[1] || '',
       publishedAt: isNaN(date) ? null : date.toISOString(),
     };
@@ -103,18 +108,20 @@ async function news() {
   if (Date.now() - newsCache.at > 30 * 60 * 1000) {
     const results = await Promise.allSettled(NEWS_FEEDS.map(async f => {
       // Без таймаута зависшая лента держит блок новостей в «Загрузка…» бесконечно
-      const r = await fetch(f.url, { headers: { 'User-Agent': 'Mozilla/5.0 (best-films)' }, signal: AbortSignal.timeout(10000) })
-        .catch(e => { throw new Error(`${f.source}: ${e.name === 'TimeoutError' ? 'не ответил за 10 секунд' : e.cause?.code || e.cause?.message || e.message}`); });
+      const r = await fetch(f.url, { headers: { 'User-Agent': 'Mozilla/5.0 (best-films)' }, signal: AbortSignal.timeout(7000) })
+        .catch(e => { throw new Error(`${f.source}: ${e.name === 'TimeoutError' ? 'не ответил за 7 секунд' : e.cause?.code || e.cause?.message || e.message}`); });
       if (!r.ok) throw new Error(`${f.source} ответил ${r.status}`);
       const items = parseRss(await r.text(), f.source);
       if (!items.length) throw new Error(`${f.source}: в ответе нет новостей`);
-      return items.slice(0, f.take);
+      return items.map(n => ({ ...n, group: f.group }));
     }));
     const errors = results.filter(r => r.status === 'rejected').map(r => r.reason.message);
     if (errors.length) console.error('Новости:', errors.join('; ')); // видно во вкладке Logs на Render
-    const items = results.flatMap(r => (r.status === 'fulfilled' ? r.value : []));
+    const all = results.flatMap(r => (r.status === 'fulfilled' ? r.value : []));
+    // Из каждой группы самые свежие новости, какие бы ленты ни ответили
+    const items = Object.entries(NEWS_TAKE).flatMap(([g, n]) => all.filter(x => x.group === g).sort(byDate).slice(0, n));
     if (!items.length) throw new Error(errors.join('; '));
-    newsCache = { at: Date.now(), items: items.sort((a, b) => (b.publishedAt || '').localeCompare(a.publishedAt || '')) };
+    newsCache = { at: Date.now(), items: items.sort(byDate) };
   }
   return newsCache.items;
 }
