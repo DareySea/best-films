@@ -54,9 +54,8 @@ dialog input:not([type=file]) { width: 100%; padding: 8px 12px; border-radius: 8
 
 /* витрина */
 .showcase { --per: 4; --gap: 24px; overflow: hidden; }
-.track { position: relative; display: flex; gap: var(--gap); transition: transform .8s ease-in-out; }
+.track { position: relative; display: flex; gap: var(--gap); will-change: transform; }
 .track .card { flex: 0 0 calc((100% - (var(--per) - 1) * var(--gap)) / var(--per)); min-width: 0; }
-@media (prefers-reduced-motion: reduce) { .track { transition: none; } }
 .card { text-decoration: none; display: flex; flex-direction: column; gap: 6px; }
 .card img { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 10px; background: var(--panel); transition: transform .2s; }
 .card:hover img { transform: scale(1.04); }

@@ -184,24 +184,37 @@ function renderHome() {
   }).catch(err => { $('#news').innerHTML = `<p class="muted">Новости недоступны: ${esc(err.message)}</p>`; });
 }
 
-// Витрина: видно 4 фильма (на телефоне 2), раз в 3 секунды сдвигается на один вправо,
-// у конца списка разворачивается обратно; пока мышь над витриной или фокус на карточке — стоит
+// Витрина как закольцованная киноплёнка: видно 4 фильма (на телефоне 2), лента бесконечно
+// и медленно плывёт, за последним фильмом сразу идёт первый. Пока мышь над витриной — стоит.
+const FILM_SPEED = 30; // пикселей в секунду
 function startCarousel() {
   const box = $('#showcase'), track = box.firstElementChild;
-  let pos = 0, dir = 1;
-  const maxPos = () => Math.max(0, track.children.length - +getComputedStyle(box).getPropertyValue('--per'));
-  const move = () => { track.style.transform = `translateX(${-(track.children[pos]?.offsetLeft || 0)}px)`; };
-  setInterval(() => {
-    const max = maxPos();
-    if (!max || box.matches(':hover, :focus-within')) return;
-    if (pos + dir > max || pos + dir < 0) dir = -dir;
-    pos = Math.min(max, Math.max(0, pos + dir));
-    move();
-  }, 3000);
-  addEventListener('resize', () => { pos = Math.min(pos, maxPos()); move(); });
+  const cards = [...track.children];
+  if (cards.length <= +getComputedStyle(box).getPropertyValue('--per')) return; // все и так видны, крутить нечего
+  // Вторая копия карточек нужна для бесшовного стыка; она только для глаз, не для клавиатуры и экранных дикторов
+  for (const c of cards) {
+    const copy = c.cloneNode(true);
+    copy.setAttribute('aria-hidden', 'true');
+    copy.tabIndex = -1;
+    track.append(copy);
+  }
+  let offset = 0, last = performance.now();
+  const loopWidth = () => track.children[cards.length].offsetLeft; // где начинается копия
+  let width = loopWidth();
+  addEventListener('resize', () => { width = loopWidth(); });
+  const move = () => { track.style.transform = `translateX(${-offset}px)`; };
+  requestAnimationFrame(function frame(now) {
+    const dt = Math.min(now - last, 100) / 1000; // после неактивной вкладки не прыгаем
+    last = now;
+    if (!box.matches(':hover, :focus-within')) {
+      offset = (offset + FILM_SPEED * dt) % width;
+      move();
+    }
+    requestAnimationFrame(frame);
+  });
   // Карточку, на которую перешли клавишей Tab, прокручиваем в видимую часть
   track.addEventListener('focusin', e => {
-    pos = Math.min([...track.children].indexOf(e.target.closest('.card')), maxPos());
+    offset = e.target.closest('.card').offsetLeft % width;
     move();
   });
 }
