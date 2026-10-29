@@ -31,6 +31,7 @@ document.body.insertAdjacentHTML('afterbegin', `
     <label>Год<input name="year" type="number" min="1880" max="2100"></label>
     <label>Обложка *<input name="poster" type="file" accept="image/jpeg,image/png,image/webp" required></label>
     <img id="manualPreview" class="preview" alt="" hidden>
+    <label>Режиссёр<input name="director" maxlength="200"></label>
     <label>Синопсис<textarea name="synopsis" rows="4" maxlength="5000"></textarea></label>
     <label>Жанры через запятую<input name="genres" placeholder="драма, комедия"></label>
     <p id="genreHint" class="muted hint"></p>
@@ -106,7 +107,7 @@ $('#manualForm').addEventListener('submit', async e => {
   e.submitter.disabled = true;
   try {
     const film = await api('/api/films/manual', { method: 'POST', body: {
-      title: form.elements.title.value, year: form.elements.year.value, synopsis: form.elements.synopsis.value, poster: manualPoster,
+      title: form.elements.title.value, year: form.elements.year.value, synopsis: form.elements.synopsis.value, poster: manualPoster, director: form.elements.director.value,
       genres: form.elements.genres.value.split(','),
     } });
     location.href = '/film?id=' + film.id;
@@ -170,10 +171,11 @@ function renderHome() {
   const g = params.get('genre');
   const list = g ? films.filter(f => f.genres.includes(g)) : films;
   $('#empty').hidden = list.length > 0;
-  $('#showcase').innerHTML = list.map(f =>
-    `<a class="card" href="/film?id=${f.id}"><img src="${safeUrl(f.poster)}" alt="" loading="lazy"><span>${esc(f.title)}</span><b>${scoreBadges(f)}</b></a>`).join('');
-  shuffleShowcase();
-  setInterval(shuffleShowcase, 5000);
+  // Порядок случайный при каждом заходе, дальше витрина листается туда-обратно
+  const shuffled = [...list].sort(() => Math.random() - 0.5);
+  $('#showcase').innerHTML = '<div class="track">' + shuffled.map(f =>
+    `<a class="card" href="/film?id=${f.id}"><img src="${safeUrl(f.poster)}" alt="" loading="lazy"><span>${esc(f.title)}</span><b>${scoreBadges(f)}</b></a>`).join('') + '</div>';
+  startCarousel();
 
   api('/api/news').then(items => {
     $('#news').innerHTML = items.map(n => `<a class="news-card" href="${safeUrl(n.url)}" target="_blank" rel="noopener">
@@ -182,20 +184,25 @@ function renderHome() {
   }).catch(err => { $('#news').innerHTML = `<p class="muted">Новости недоступны: ${esc(err.message)}</p>`; });
 }
 
-// Витрина: перемешиваем карточки и плавно перевозим каждую со старого места на новое (FLIP)
-function shuffleShowcase() {
-  const box = $('#showcase');
-  const cards = [...box.children];
-  if (cards.length < 2 || box.matches(':hover') || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const before = new Map(cards.map(c => [c, c.getBoundingClientRect()]));
-  for (let i = cards.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [cards[i], cards[j]] = [cards[j], cards[i]];
-  }
-  box.append(...cards);
-  cards.forEach(c => {
-    const a = before.get(c), b = c.getBoundingClientRect();
-    c.animate([{ transform: `translate(${a.left - b.left}px, ${a.top - b.top}px)` }, { transform: 'none' }], { duration: 900, easing: 'ease-in-out' });
+// Витрина: видно 4 фильма (на телефоне 2), раз в 3 секунды сдвигается на один вправо,
+// у конца списка разворачивается обратно; пока мышь над витриной или фокус на карточке — стоит
+function startCarousel() {
+  const box = $('#showcase'), track = box.firstElementChild;
+  let pos = 0, dir = 1;
+  const maxPos = () => Math.max(0, track.children.length - +getComputedStyle(box).getPropertyValue('--per'));
+  const move = () => { track.style.transform = `translateX(${-(track.children[pos]?.offsetLeft || 0)}px)`; };
+  setInterval(() => {
+    const max = maxPos();
+    if (!max || box.matches(':hover, :focus-within')) return;
+    if (pos + dir > max || pos + dir < 0) dir = -dir;
+    pos = Math.min(max, Math.max(0, pos + dir));
+    move();
+  }, 3000);
+  addEventListener('resize', () => { pos = Math.min(pos, maxPos()); move(); });
+  // Карточку, на которую перешли клавишей Tab, прокручиваем в видимую часть
+  track.addEventListener('focusin', e => {
+    pos = Math.min([...track.children].indexOf(e.target.closest('.card')), maxPos());
+    move();
   });
 }
 
@@ -232,6 +239,7 @@ async function renderFilm() {
       <div class="about">
         <h2>${esc(f.title)} <small>${f.year || ''}</small></h2>
         ${f.original && f.original !== f.title ? `<p class="muted">${esc(f.original)}</p>` : ''}
+        ${f.director ? `<p class="director"><span class="muted">Режиссёр:</span> ${esc(f.director)}</p>` : ''}
         <div class="tags">${f.genres.map(g => `<a href="/?genre=${encodeURIComponent(g)}">${esc(g)}</a>`).join('')}</div>
         <p class="synopsis">${esc(f.synopsis) || '<span class="muted">Синопсиса нет</span>'}</p>
         ${admin ? '<button id="del" class="danger">Удалить из списка</button>' : ''}
