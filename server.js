@@ -77,6 +77,9 @@ async function kp(apiPath) {
   return r.json();
 }
 
+const directorOf = async id => (await kp('/api/v1/staff?filmId=' + id))
+  .filter(s => s.professionKey === 'DIRECTOR').map(s => s.nameRu || s.nameEn).filter(Boolean).join(', ');
+
 // Новости Кинопоиска в неофициальном API перестали обновляться в 2024, поэтому берём RSS-ленты
 // Лент кино несколько: какая-то может не пускать зарубежные серверы Render (так было с КГ-Порталом)
 const NEWS_FEEDS = [
@@ -191,7 +194,16 @@ async function api(req, res, url) {
   const one = /^\/api\/films\/(\d+)$/.exec(p);
   if (one && req.method === 'GET') {
     const f = films.find(f => f.id === +one[1]);
-    return f ? send(res, 200, f) : send(res, 404, { error: 'Фильм не найден' });
+    if (!f) return send(res, 404, { error: 'Фильм не найден' });
+    // Фильмы, добавленные до появления режиссёра, дополняем при первом открытии; при ошибке попробуем в следующий раз
+    if (f.director === undefined && !f.manual && KP_KEY) {
+      const director = await directorOf(f.id).catch(() => undefined);
+      if (director !== undefined) {
+        f.director = director;
+        await save().catch(() => {});
+      }
+    }
+    return send(res, 200, f);
   }
 
   const pm = /^\/api\/poster\/(\d+)$/.exec(p);
@@ -228,6 +240,7 @@ async function api(req, res, url) {
     const film = {
       id, title, original: '', year, poster: `/api/poster/${id}`,
       synopsis: typeof b.synopsis === 'string' ? b.synopsis.trim().slice(0, 5000) : '',
+      director: typeof b.director === 'string' ? b.director.trim().slice(0, 200) : '',
       genres: [...new Set(genres)].slice(0, 10), manual: true,
       him: { rating: null, comment: '' }, her: { rating: null, comment: '' }, addedAt: id,
     };
@@ -240,10 +253,10 @@ async function api(req, res, url) {
     if (!Number.isInteger(id) || id <= 0) return send(res, 400, { error: 'Некорректный id' });
     const existing = films.find(f => f.id === id);
     if (existing) return send(res, 200, existing);
-    const d = await kp('/api/v2.2/films/' + id);
+    const [d, director] = await Promise.all([kp('/api/v2.2/films/' + id), directorOf(id).catch(() => undefined)]);
     const film = {
       id, title: d.nameRu || d.nameOriginal || d.nameEn, original: d.nameOriginal || '', year: d.year,
-      poster: d.posterUrl, synopsis: d.description || d.shortDescription || '',
+      poster: d.posterUrl, synopsis: d.description || d.shortDescription || '', director,
       genres: (d.genres || []).map(g => g.genre),
       him: { rating: null, comment: '' }, her: { rating: null, comment: '' }, addedAt: Date.now(),
     };
