@@ -102,12 +102,18 @@ let newsCache = { at: 0, items: [] };
 async function news() {
   if (Date.now() - newsCache.at > 30 * 60 * 1000) {
     const results = await Promise.allSettled(NEWS_FEEDS.map(async f => {
-      const r = await fetch(f.url, { headers: { 'User-Agent': 'Mozilla/5.0 (best-films)' } });
-      if (!r.ok) throw new Error(f.source + ' ответил ' + r.status);
-      return parseRss(await r.text(), f.source).slice(0, f.take);
+      // Без таймаута зависшая лента держит блок новостей в «Загрузка…» бесконечно
+      const r = await fetch(f.url, { headers: { 'User-Agent': 'Mozilla/5.0 (best-films)' }, signal: AbortSignal.timeout(10000) })
+        .catch(e => { throw new Error(`${f.source}: ${e.name === 'TimeoutError' ? 'не ответил за 10 секунд' : e.cause?.code || e.cause?.message || e.message}`); });
+      if (!r.ok) throw new Error(`${f.source} ответил ${r.status}`);
+      const items = parseRss(await r.text(), f.source);
+      if (!items.length) throw new Error(`${f.source}: в ответе нет новостей`);
+      return items.slice(0, f.take);
     }));
+    const errors = results.filter(r => r.status === 'rejected').map(r => r.reason.message);
+    if (errors.length) console.error('Новости:', errors.join('; ')); // видно во вкладке Logs на Render
     const items = results.flatMap(r => (r.status === 'fulfilled' ? r.value : []));
-    if (!items.length) throw new Error('ленты новостей недоступны');
+    if (!items.length) throw new Error(errors.join('; '));
     newsCache = { at: Date.now(), items: items.sort((a, b) => (b.publishedAt || '').localeCompare(a.publishedAt || '')) };
   }
   return newsCache.items;
