@@ -19,7 +19,9 @@ button.danger { background: none; border-color: #a33; color: #f77; margin-top: 1
 .top h1 { margin: 0 0 12px; font-size: clamp(24px, 4vw, 40px); }
 .top h1 a { text-decoration: none; }
 .login { position: absolute; left: 16px; top: 16px; }
-.search { position: relative; max-width: 560px; margin: 0 auto; }
+.search-row { display: flex; gap: 8px; max-width: 760px; margin: 0 auto; }
+.search { position: relative; flex: 1; }
+.search-row > button { flex: none; }
 .search input { width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); }
 .results { position: absolute; z-index: 10; left: 0; right: 0; top: calc(100% + 4px); max-height: 70vh; overflow: auto;
   background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px; text-align: left; }
@@ -30,9 +32,15 @@ button.danger { background: none; border-color: #a33; color: #f77; margin-top: 1
 .res a { color: var(--accent); }
 
 dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 20px; width: min(320px, 90vw); }
+#manualDlg { width: min(480px, 92vw); }
+#manualForm { display: flex; flex-direction: column; gap: 10px; }
+#manualForm label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--muted); }
+#manualForm textarea { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); resize: vertical; }
+.preview { width: 100px; border-radius: 8px; }
+.hint { margin: -4px 0 0; font-size: 13px; }
 dialog::backdrop { background: #0009; }
 dialog h3 { margin-top: 0; }
-dialog input { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); }
+dialog input:not([type=file]) { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); }
 .row { display: flex; justify-content: flex-end; gap: 8px; }
 
 /* раскладка: жанры слева, контент справа */
@@ -45,23 +53,27 @@ dialog input { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px s
 .genres a.active span { color: #fff; }
 
 /* витрина */
-.showcase { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 20px; }
+.showcase { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 24px; }
 .card { text-decoration: none; display: flex; flex-direction: column; gap: 6px; }
 .card img { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 10px; background: var(--panel); transition: transform .2s; }
 .card:hover img { transform: scale(1.04); }
-.card span { font-weight: 600; }
+.card span { font-weight: 600; font-size: 17px; }
 .card b { display: flex; gap: 8px; font-weight: normal; font-size: 13px; }
 .card i { font-style: normal; }
-.card i:first-child { color: var(--him); }
-.card i:last-child { color: var(--her); }
+.card i.him { color: var(--him); }
+.card i.her { color: var(--her); }
 
 /* новости */
 .news { max-width: 1400px; margin: 0 auto; padding: 8px 16px 40px; border-top: 1px solid var(--line); }
-.news-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
-.news-card { display: flex; flex-direction: column; gap: 6px; text-decoration: none; background: var(--panel); border-radius: 10px; overflow: hidden; padding-bottom: 10px; }
-.news-card img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--line); }
-.news-card b, .news-card small { padding: 0 12px; }
-.news-card small { color: var(--muted); }
+.news h2 { font-size: 18px; }
+/* Новости — ровно две строки компактных карточек, главное на странице — фильмы */
+.news-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.news-card:nth-child(n+9) { display: none; }
+.news-card { display: grid; grid-template-columns: 96px 1fr; grid-template-rows: 1fr auto; column-gap: 10px; text-decoration: none; background: var(--panel); border-radius: 10px; overflow: hidden; font-size: 14px; }
+.news-card img { grid-row: 1 / 3; width: 96px; height: 100%; min-height: 72px; object-fit: cover; background: var(--line); }
+.news-card b { font-weight: 600; padding-top: 8px; padding-right: 8px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.news-card small { color: var(--muted); padding-bottom: 8px; }
+@media (max-width: 1100px) { .news-grid { grid-template-columns: repeat(2, 1fr); } .news-card:nth-child(n+5) { display: none; } }
 
 /* страница фильма */
 .film-top { display: grid; grid-template-columns: minmax(200px, 300px) 1fr; gap: 28px; }
@@ -87,6 +99,9 @@ blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--c); fon
 
 @media (max-width: 760px) {
   .login { position: static; margin-bottom: 12px; }
+  .search-row { flex-direction: column; }
+  .news-grid { grid-template-columns: 1fr; }
+  .news-card:nth-child(n+3) { display: none; }
   .layout { grid-template-columns: 1fr; }
   .genres { display: flex; gap: 6px; overflow-x: auto; }
   .genres h2 { display: none; }

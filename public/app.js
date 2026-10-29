@@ -1,6 +1,6 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const safeUrl = u => (/^https?:\/\//.test(u || '') ? esc(u) : '#'); // данные с Кинопоиска не должны подсунуть javascript:
+const safeUrl = u => (/^(https?:\/\/|\/api\/poster\/\d+$)/.test(u || '') ? esc(u) : '#'); // данные с Кинопоиска не должны подсунуть javascript:
 const params = new URLSearchParams(location.search);
 let admin = false, films = [];
 
@@ -16,11 +16,28 @@ document.body.insertAdjacentHTML('afterbegin', `
 <header class="top">
   <button id="loginBtn" class="login">Войти как админ</button>
   <h1><a href="/">Лучший список фильмов</a></h1>
-  <div class="search">
-    <input id="q" type="search" placeholder="Поиск фильма…" autocomplete="off" aria-label="Поиск фильма">
-    <div id="results" class="results" hidden></div>
+  <div class="search-row">
+    <div class="search">
+      <input id="q" type="search" placeholder="Поиск фильма…" autocomplete="off" aria-label="Поиск фильма">
+      <div id="results" class="results" hidden></div>
+    </div>
+    <button id="manualBtn" hidden>Добавить самостоятельно</button>
   </div>
 </header>
+<dialog id="manualDlg">
+  <form method="dialog" id="manualForm">
+    <h3>Добавить фильм самостоятельно</h3>
+    <label>Название *<input name="title" required maxlength="200"></label>
+    <label>Год<input name="year" type="number" min="1880" max="2100"></label>
+    <label>Обложка *<input name="poster" type="file" accept="image/jpeg,image/png,image/webp" required></label>
+    <img id="manualPreview" class="preview" alt="" hidden>
+    <label>Синопсис<textarea name="synopsis" rows="4" maxlength="5000"></textarea></label>
+    <label>Жанры через запятую<input name="genres" placeholder="драма, комедия"></label>
+    <p id="genreHint" class="muted hint"></p>
+    <p id="manualErr" class="err" role="alert"></p>
+    <div class="row"><button value="cancel" formnovalidate>Отмена</button><button value="ok" class="primary">Добавить</button></div>
+  </form>
+</dialog>
 <dialog id="loginDlg">
   <form method="dialog" id="loginForm">
     <h3>Вход для админа</h3>
@@ -49,6 +66,54 @@ $('#loginForm').addEventListener('submit', async e => {
     await api('/api/login', { method: 'POST', body: { password: $('#pw').value } });
     location.reload();
   } catch (err) { $('#pwErr').textContent = err.message; }
+});
+
+// --- ручное добавление фильма, которого нет на Кинопоиске ---
+// Уменьшаем обложку в браузере: она хранится в Gist как текст, и большие файлы замедлят сайт
+async function shrinkImage(file) {
+  const img = await createImageBitmap(file);
+  const k = Math.min(1, 500 / img.width, 750 / img.height);
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.width * k);
+  c.height = Math.round(img.height * k);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.85);
+}
+
+let manualPoster = '';
+$('#manualBtn').onclick = () => {
+  const all = [...new Set(films.flatMap(f => f.genres))].sort();
+  $('#genreHint').textContent = all.length ? 'Уже есть: ' + all.join(', ') : '';
+  $('#manualDlg').showModal();
+};
+$('#manualForm').elements.poster.addEventListener('change', async e => {
+  manualPoster = '';
+  $('#manualPreview').hidden = true;
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    manualPoster = await shrinkImage(file);
+    $('#manualPreview').src = manualPoster;
+    $('#manualPreview').hidden = false;
+    $('#manualErr').textContent = '';
+  } catch { $('#manualErr').textContent = 'Не получилось открыть картинку'; }
+});
+$('#manualForm').addEventListener('submit', async e => {
+  if (e.submitter?.value !== 'ok') return;
+  e.preventDefault();
+  const form = e.target;
+  if (!manualPoster) return ($('#manualErr').textContent = 'Загрузите обложку');
+  e.submitter.disabled = true;
+  try {
+    const film = await api('/api/films/manual', { method: 'POST', body: {
+      title: form.elements.title.value, year: form.elements.year.value, synopsis: form.elements.synopsis.value, poster: manualPoster,
+      genres: form.elements.genres.value.split(','),
+    } });
+    location.href = '/film?id=' + film.id;
+  } catch (err) {
+    $('#manualErr').textContent = err.message;
+    e.submitter.disabled = false;
+  }
 });
 
 function renderGenres() {
@@ -98,7 +163,7 @@ $('#results').addEventListener('click', async e => {
 
 // --- стартовая страница ---
 function scoreBadges(f) {
-  return `${f.him.rating ? `<i title="Оценка от него">♂ ${f.him.rating}/5</i>` : ''}${f.her.rating ? `<i title="Оценка от неё">♀ ${f.her.rating}/10</i>` : ''}`;
+  return `${f.him.rating ? `<i class="him" title="Оценка от него">♂ ${f.him.rating}/5</i>` : ''}${f.her.rating ? `<i class="her" title="Оценка от неё">♀ ${f.her.rating}/10</i>` : ''}`;
 }
 
 function renderHome() {
@@ -113,7 +178,7 @@ function renderHome() {
   api('/api/news').then(items => {
     $('#news').innerHTML = items.map(n => `<a class="news-card" href="${safeUrl(n.url)}" target="_blank" rel="noopener">
       <img src="${safeUrl(n.imageUrl)}" alt="" loading="lazy"><b>${esc(n.title)}</b>
-      <small>${n.publishedAt ? new Date(n.publishedAt).toLocaleDateString('ru-RU') : ''}</small></a>`).join('') || '<p class="muted">Новостей нет</p>';
+      <small>${esc(n.source)}${n.publishedAt ? ' · ' + new Date(n.publishedAt).toLocaleDateString('ru-RU') : ''}</small></a>`).join('') || '<p class="muted">Новостей нет</p>';
   }).catch(err => { $('#news').innerHTML = `<p class="muted">Новости недоступны: ${esc(err.message)}</p>`; });
 }
 
@@ -203,6 +268,7 @@ async function renderFilm() {
   } catch (err) { main.innerHTML = `<p class="err">Сервер недоступен: ${esc(err.message)}</p>`; return; }
   $('#loginBtn').textContent = admin ? 'Выйти (админ)' : 'Войти как админ';
   $('#q').placeholder = admin ? 'Найти фильм в списке или на Кинопоиске…' : 'Поиск фильма…';
+  $('#manualBtn').hidden = !admin;
   renderGenres();
   document.body.dataset.page === 'home' ? renderHome() : renderFilm();
 })();
