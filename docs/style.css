@@ -58,6 +58,7 @@ dialog input:not([type=file]), #manualForm textarea { width: 100%; padding: 9px 
 
 /* раскладка: жанры слева, контент справа; ширина «киноэкрана» до 1600px */
 .layout { display: grid; grid-template-columns: 200px 1fr; gap: 32px; padding: 16px 24px 64px; max-width: 1600px; margin: 0 auto; }
+.layout > main { min-width: 0; } /* иначе колонка сетки растягивается по ширине всей ленты и страница едет вбок */
 .genres h2 { color: var(--slate); margin: 0 0 12px; }
 .genres a { display: flex; justify-content: space-between; padding: 7px 10px; border-radius: 4px; text-decoration: none; color: var(--muted); font-size: 15px; }
 .genres a span { color: var(--slate); font-size: 13px; }
