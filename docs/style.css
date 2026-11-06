@@ -79,6 +79,15 @@ dialog input:not([type=file]), #manualForm textarea { width: 100%; padding: 9px 
 .card i.him { color: var(--him); }
 .card i.her { color: var(--her); }
 
+/* страница жанра: плитки, которые листаются вниз, и сортировка */
+.showcase.as-page { overflow: visible; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 24px; }
+.toolbar h2 { margin: 0; font-size: clamp(28px, 4vw, 40px); font-weight: 400; line-height: 1; letter-spacing: -1px; }
+.toolbar h2 span { color: var(--slate); font-size: .5em; letter-spacing: 0; }
+.sort { display: flex; gap: 6px; }
+.sort button[aria-pressed=true] { background: var(--text); border-color: var(--text); color: var(--bg); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 24px; }
+
 /* новости — ровно две строки компактных карточек, главное на странице — фильмы */
 .news { max-width: 1600px; margin: 0 auto; padding: 48px 24px 78px; border-top: 1px solid var(--line); }
 .news h2 { color: var(--slate); margin: 0 0 20px; }
@@ -126,6 +135,7 @@ blockquote { margin: 0; padding-left: 14px; border-left: 2px solid var(--c); col
   .layout { grid-template-columns: 1fr; padding: 8px 16px 48px; gap: 20px; }
   .news { padding: 32px 16px 48px; }
   .showcase { --per: 2; --gap: 12px; }
+  .tiles { grid-template-columns: repeat(2, 1fr); gap: 12px; }
   .card span { font-size: 16px; }
   .genres { display: flex; gap: 6px; overflow-x: auto; }
   .genres h2 { display: none; }

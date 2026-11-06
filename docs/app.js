@@ -281,15 +281,56 @@ async function loadNews() {
   return items.sort((a, b) => (+b.publishedAt || 0) - (+a.publishedAt || 0));
 }
 
+const card = f => `<a class="card" href="film.html?id=${f.id}"><img src="${safeUrl(f.poster)}" alt="" loading="lazy"><span>${esc(f.title)}</span><b>${scoreBadges(f)}</b></a>`;
+
+// У него оценка по пятибалльной шкале, у неё по десятибалльной: приводим к десяти и берём среднюю из выставленных
+const ratingOf = f => {
+  const v = [f.him.rating && f.him.rating * 2, f.her.rating].filter(Boolean);
+  return v.length ? v.reduce((a, b) => a + b) / v.length : 0;
+};
+const byTitle = (a, b) => a.title.localeCompare(b.title, 'ru');
+const SORTS = {
+  alpha: ['По алфавиту', byTitle],
+  rating: ['По рейтингу', (a, b) => ratingOf(b) - ratingOf(a) || byTitle(a, b)], // без оценок — в конце
+};
+
+// Страница жанра: плитки, которые листаются вниз, и кнопки сортировки; выбор хранится в адресе (?sort=)
+function renderTiles(genre, list) {
+  const box = $('#showcase');
+  box.classList.add('as-page');
+  let sort = Object.hasOwn(SORTS, params.get('sort')) ? params.get('sort') : 'alpha';
+  const draw = () => {
+    box.innerHTML = `<div class="toolbar"><h2>${esc(genre)} <span>${list.length}</span></h2>
+      <div class="sort" role="group" aria-label="Сортировка">${Object.entries(SORTS).map(([k, [label]]) =>
+        `<button data-sort="${k}" aria-pressed="${k === sort}">${label}</button>`).join('')}</div></div>
+      <div class="tiles">${[...list].sort(SORTS[sort][1]).map(card).join('')}</div>`;
+  };
+  box.onclick = e => {
+    const k = e.target.dataset.sort;
+    if (!k || k === sort) return;
+    sort = k;
+    params.set('sort', k);
+    history.replaceState(null, '', '?' + params);
+    draw();
+    box.querySelector(`[data-sort="${k}"]`).focus(); // фокус остаётся на кнопке, хотя блок перерисован
+  };
+  draw();
+}
+
 function renderHome() {
   const g = params.get('genre');
   const list = g ? films.filter(f => f.genres.includes(g)) : films;
   $('#empty').hidden = list.length > 0;
-  // Порядок случайный при каждом заходе
-  const shuffled = [...list].sort(() => Math.random() - 0.5);
-  $('#showcase').innerHTML = '<div class="track">' + shuffled.map(f =>
-    `<a class="card" href="film.html?id=${f.id}"><img src="${safeUrl(f.poster)}" alt="" loading="lazy"><span>${esc(f.title)}</span><b>${scoreBadges(f)}</b></a>`).join('') + '</div>';
-  startCarousel();
+  if (g) {
+    document.title = `${g} — Лучший список фильмов`;
+    if (list.length) renderTiles(g, list);
+    else $('#empty').textContent = 'В этом жанре пока нет фильмов.';
+  } else {
+    // Лента-киноплёнка только на главной; порядок случайный при каждом заходе
+    const shuffled = [...list].sort(() => Math.random() - 0.5);
+    $('#showcase').innerHTML = '<div class="track">' + shuffled.map(card).join('') + '</div>';
+    startCarousel();
+  }
 
   loadNews().then(items => {
     $('#news').innerHTML = items.map(n => `<a class="news-card" href="${safeUrl(n.url)}" target="_blank" rel="noopener">
