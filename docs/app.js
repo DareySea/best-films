@@ -75,6 +75,7 @@ document.body.insertAdjacentHTML('afterbegin', `
       <input id="q" type="search" placeholder="Поиск фильма…" autocomplete="off" aria-label="Поиск фильма">
       <div id="results" class="results" hidden></div>
     </div>
+    <button id="randomBtn" hidden>Случайный фильм</button>
     <button id="manualBtn" hidden>Добавить самостоятельно</button>
   </div>
 </header>
@@ -155,6 +156,13 @@ async function shrinkImage(file) {
 }
 
 let manualPoster = '';
+// Случайный фильм из всего списка; на странице фильма не выпадает тот же самый
+$('#randomBtn').onclick = () => {
+  const here = Number(params.get('id'));
+  const pool = films.filter(f => f.id !== here);
+  if (pool.length) location.href = 'film.html?id=' + pool[Math.floor(Math.random() * pool.length)].id;
+};
+
 $('#manualBtn').onclick = () => {
   const all = [...new Set(films.flatMap(f => f.genres))].sort();
   $('#genreHint').textContent = all.length ? 'Уже есть: ' + all.join(', ') : '';
@@ -457,6 +465,7 @@ function renderFilm() {
     main.innerHTML = `<p class="err">Не удалось загрузить список: ${esc(err.message)}${admin ? '. Попробуйте выйти и войти заново.' : ''}</p>`;
     return;
   }
+  $('#randomBtn').hidden = !films.length;
   renderGenres();
   document.body.dataset.page === 'home' ? renderHome() : renderFilm();
 })();
