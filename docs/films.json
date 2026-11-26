@@ -2455,5 +2455,27 @@
       "comment": "На раз пойдет. Среднячок. Честейн прекрасно играет криповую маму"
     },
     "addedAt": 1794766809193
+  },
+  {
+    "id": 1256158,
+    "title": "Заводчица",
+    "original": "Breeder",
+    "year": 2026,
+    "poster": "https://kinopoiskapiunofficial.tech/images/posters/kp/1256158.jpg",
+    "synopsis": "",
+    "director": "Алекс Гойетт",
+    "genres": [
+      "триллер",
+      "ужасы"
+    ],
+    "him": {
+      "rating": null,
+      "comment": ""
+    },
+    "her": {
+      "rating": null,
+      "comment": ""
+    },
+    "addedAt": 1795672680089
   }
 ]
